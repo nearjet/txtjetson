@@ -1,0 +1,324 @@
+
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Landing widget</title>
+
+        <style>
+          @import url('')
+        </style>
+
+        
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/js-cookie@3.0.1/dist/js.cookie.min.js"></script>
+  <script src="https://unpkg.com/libphonenumber-js@1.9.50/bundle/libphonenumber-min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.16/js/intlTelInput-jquery.min.js" integrity="sha512-+xuLsxQN3JBrnBSAr/vOlUqZfQ0OwpqZfdbuiQVpzjd5Y85F8F2AyzP4YNVDrpR29EolzELxc62br5gWK51phQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.16/css/intlTelInput.css" integrity="sha512-gxWow8Mo6q6pLa1XH/CcH8JyiSDEtiwJV78E+D+QP0EVasFs8wKXq16G8CLD4CJ2SnonHr4Lm/yY2fSI2+cbmw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+  <!-- Meta Pixel Code -->
+  <script>
+    !function(f,b,e,v,n,t,s)
+    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+      n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+      if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+      n.queue=[];t=b.createElement(e);t.async=!0;
+      t.src=v;s=b.getElementsByTagName(e)[0];
+      s.parentNode.insertBefore(t,s)}(window, document,'script',
+      'https://connect.facebook.net/en_US/fbevents.js');
+    fbq('init', '642419070458152');
+    // fbq('track', 'PageView');
+  </script>
+  <noscript><img height="1" width="1" style="display:none"
+                 src="https://www.facebook.com/tr?id=642419070458152&ev=PageView&noscript=1"
+  /></noscript>
+
+        <script type="text/javascript">
+            
+  function formatPhoneNumber(inputNumberString) {
+    if (inputNumberString) {
+      try {
+        const phoneNumber = libphonenumber.parsePhoneNumber(inputNumberString)
+        if (phoneNumber.countryCallingCode === '1') {
+          return '+1 ' + phoneNumber.formatNational()
+        } else {
+          return phoneNumber.formatInternational()
+        }
+      } catch (error) {
+        return inputNumberString
+      }
+    }
+    return inputNumberString
+  }
+;
+
+            $(document).ready(function () {
+
+                // Set up phone widget
+                
+  $("#phone").intlTelInput({
+    utilsScript: 'https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.16/js/utils.min.js',
+    numberType: "MOBILE",
+    nationalMode: false,
+    autoFormat: true,
+    autoPlaceholder: true,
+    formatOnDisplay: false,
+    autoHideDialCode: false,
+    initialCountry: "auto",
+     geoIpLookup: function(success, failure) {
+      fetch("https://app.superphone.io/country-calling-code", { method: 'POST'})
+      .then((data) => {
+        data.json()
+        .then(response => {
+          const countryCode = response ? response.country : 'us'
+          success(countryCode)
+        })
+      })
+      .catch(() => failure('US'))
+    },
+    preferredCountries: ['us', 'gb', 'de']
+  });
+
+  $('#phone').keypress(function (e) {
+    var charCode = (e.which) ? e.which : event.keyCode
+    if (String.fromCharCode(charCode).match(/^[\+\d]?(?:[\d-.\s()]*)$/)) {
+      return true;
+    }
+    return false;
+  });
+
+  $("#phone").keyup(function() {
+    var fieldInstance = window.intlTelInputGlobals.instances[0];
+    var inputValue = $(this).val();
+    var number3 = formatPhoneNumber(inputValue);
+    $('.form-error').hide();
+    if (number3 !== inputValue) {
+      fieldInstance.setNumber(number3);
+    }
+  })
+;
+
+                // Click on button send
+                
+  $('#addContact').submit(function (event) {
+      event.preventDefault();
+      var validForm = true
+      var formData = $("#addContact").serializeArray();
+      $('#submitButton').prop('disabled', true);
+      $('.form-error').hide();
+
+      // Convert the form data to backend format
+      var requestData = {};
+      formData.map(function (element) {
+        if (element.name === 'mobile') {
+          try {
+            const phoneNumberValue = element.value;
+            const numberObject = libphonenumber.parsePhoneNumber(phoneNumberValue);
+            if (numberObject.isValid()) {
+              requestData[element.name] = numberObject.number;
+            } else {
+              validForm = false;
+              $('#form-error-mobile').show();
+              $('#submitButton').prop('disabled', false);
+            }
+          } catch (error) {
+            validForm = false;
+            $('#form-error-mobile').show();
+            $('#submitButton').prop('disabled', false);
+          }
+        } else {
+          requestData[element.name] = element.value;
+        }
+      });
+
+      if (validForm) {
+        // Send post to API
+        $.ajax({
+            url: 'https://superphone.io/w/GvV0yG', // Url where to submit the request
+            type: "POST",
+            beforeSend: function (request) {
+                request.setRequestHeader("Access-Control-Allow-Origin", "*");
+            },
+            dataType: 'json',
+            contentType: 'application/json',
+            data: JSON.stringify(requestData),
+            success: function (result) {
+                $('.custom-form').hide();
+                $('.form-success').show();
+                $('#submitButton').prop('disabled', false);
+
+                var fieldInstance = window.intlTelInputGlobals.instances[0];
+                fieldInstance.setNumber('+1');
+                if (window.fbq) {
+                  window.fbq('track', 'Lead');
+                }
+            },
+            error: function (xhr, resp, text) {
+                $('#submitButton').prop('disabled', false);
+                $('.form-error').show();
+                $('#submitButton').prop('disabled', false);
+            }
+        });
+      }
+  });
+;
+            });
+        </script>
+
+        <style>
+          body {
+            margin: 0;
+          }
+
+          html,
+          body,
+          #superphone-widget-page {
+            height: 100%;
+            width: 100%;
+          }
+
+          #superphone-widget-page {
+            height: 100%;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+          }
+
+           #superphone-widget-wrapper {
+            max-width: 520px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+          }
+
+          .superphone-form-control {
+            display: block;
+            width: 100%;
+            height: 34px;
+            padding: 6px 12px;
+            font-size: 14px;
+            line-height: 1.42857143;
+            color: #555;
+            background-color: #fff;
+            background-image: none;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-shadow: inset 0 1px 1px rgba(0,0,0,.075);
+            transition: border-color ease-in-out .15s,box-shadow ease-in-out .15s;
+          }
+
+          #superphone-widget-box-wrapper {
+            background-color: #fff;
+            width: 100%;
+            min-height: 170px;
+            text-align: center;
+            padding: 10px;
+          }
+
+          #superphone-input-wrapper {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+          }
+
+          #superphone-input-wrapper .iti--allow-dropdown {
+            width: 100%;
+          }
+
+          #superphone-input-wrapper .phone-input-wrapper {
+            width: 60%;
+          }
+
+          #phone {
+            height: 48px;
+            border-radius: 3px 0 0 3px;
+            outline: none;
+            border: 1px solid #f1f1f1;
+            border-right: none;
+          }
+
+          #submitButton {
+            height: 48px;
+            border: none;
+            text-transform: uppercase;
+            cursor: pointer;
+            padding: 19px 26px;
+            font-size: 10px;
+            letter-spacing: 0.3em;
+            border-radius: 0px;
+            font-weight: 700;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
+            transition: color 0.2s linear 0s, background-color 0.1s linear 0s, border-color 0.1s
+          }
+
+          #submitButton:disabled {
+            background: #7d7d7d !important;
+            cursor: not-allowed;
+          }
+
+          #superphone-widget-title {
+            font-weight: bold;
+            font-size: 24px;
+            margin: 15px 0;
+            color: #171415;
+            line-height: 1em;
+          }
+          #superphone-widget-description {
+            font-weight: normal;
+            font-size: 14px;
+            letter-spacing: 0.01em;
+            line-height: 1.2em;
+            text-transform: none;
+            margin: 0 0 10px 0;
+          }
+          #superphone-widget-box-wrapper .form-error {
+            color: #CF6E6E;
+            font-size: 11px;
+            display: none;
+            margin: 15px 0;
+          }
+        </style>
+    </head>
+    <body>
+      <div id="superphone-widget-page" style="background-size:cover;background-repeat:no-repeat;background-image:url(https://cdn.filestackcontent.com/1OfDku0mSpeXEEKdpLDi);background-color:#ffffff;font-family:"Circular", Arial;">
+        <div id="superphone-widget-wrapper">
+          <div id="superphone-widget-box-wrapper" style="background-color: rgba(255,255,255,0.53);">
+            <div id="superphone-widget-title" style="color: #333333">Text Jetson </div>
+            <div id="superphone-widget-description" style="color: rgba(0,0,0,1)"> ENTER YOUR PHONE NUMBER BELOW AND I WILL SHOOT YOU A TEXT RIGHT BACK:</div>
+            <form id="addContact" action="#" method="POST" autocomplete="false">
+              <div id="superphone-input-wrapper">
+                <div class="phone-input-wrapper">
+                  <input
+                      autocomplete="off"
+                      tabindex="4"
+                      type="tel"
+                      class="superphone-form-control"
+                      id="phone"
+                      name="mobile"
+                      placeholder="Mobile # (w/ country code)"
+                  >
+                </div>
+                <div class="superphone-send-button">
+                  <button style="background: rgba(5,7,243,1); color: #FFFFFF; font-family: '"Circular", Arial', sans-serif;" type="submit" id="submitButton">Send</button>
+                </div>
+              </div>
+              <div id="form-error-message" class="form-error">
+                <div>Something went wrong. Please check your mobile and try again.</div>
+              </div>
+              <div id="form-error-mobile" class="form-error">
+                Phone number is not valid.
+              </div>
+            </form>
+          </div>
+        </div>
+    </div>
+    </body>
+    
